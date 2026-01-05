@@ -15,46 +15,76 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const sql = neon(process.env.DATABASE_URL!)
 
-    const oldSiblings = await sql`
-      SELECT id, display_order FROM tiers 
-      WHERE parent_id IS NOT DISTINCT FROM ${parentId || null}
-      ORDER BY display_order ASC
-    `
+    const isChangingParent = newParentId !== undefined && newParentId !== parentId
 
-    console.log("[v0] Old siblings:", oldSiblings)
-
-    if (!oldSiblings.length) {
-      return Response.json({ error: "No siblings found in old parent" }, { status: 400 })
-    }
-
-    const tierIdx = oldSiblings.findIndex((s: any) => s.id === id)
-    if (tierIdx === -1) {
-      return Response.json({ error: "Tier not found in siblings" }, { status: 404 })
-    }
-
-    if (newParentId !== undefined && newParentId !== parentId) {
+    if (isChangingParent) {
       console.log("[v0] Moving tier to new parent:", newParentId)
+      // Update the parent_id first
       await sql`UPDATE tiers SET parent_id = ${newParentId || null} WHERE id = ${id}`
-    }
 
-    const updatedOldSiblings = oldSiblings.filter((s: any) => s.id !== id)
+      // Get old siblings (excluding the moved tier)
+      const oldSiblings = await sql`
+        SELECT id, display_order FROM tiers 
+        WHERE parent_id IS NOT DISTINCT FROM ${parentId || null}
+        AND id != ${id}
+        ORDER BY display_order ASC
+      `
 
-    for (let i = 0; i < updatedOldSiblings.length; i++) {
-      await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${updatedOldSiblings[i].id}`
-    }
+      // Reorder old siblings
+      for (let i = 0; i < oldSiblings.length; i++) {
+        await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${oldSiblings[i].id}`
+      }
 
-    if (newParentId !== undefined && newParentId !== parentId) {
+      // Get new siblings (including the moved tier)
       const newSiblings = await sql`
         SELECT id, display_order FROM tiers 
         WHERE parent_id IS NOT DISTINCT FROM ${newParentId || null}
         ORDER BY display_order ASC
       `
 
-      const reorderedNewSiblings = [...newSiblings]
+      // Insert the moved tier at the new index
+      const reorderedNewSiblings = newSiblings.filter((s: any) => s.id !== id)
       reorderedNewSiblings.splice(newIndex, 0, { id })
 
+      // Update display_order for all new siblings
       for (let i = 0; i < reorderedNewSiblings.length; i++) {
         await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${reorderedNewSiblings[i].id}`
+      }
+    } else {
+      console.log("[v0] Reordering within same parent")
+
+      const siblings = await sql`
+        SELECT id, display_order FROM tiers 
+        WHERE parent_id IS NOT DISTINCT FROM ${parentId || null}
+        ORDER BY display_order ASC
+      `
+
+      console.log("[v0] Siblings before reorder:", siblings)
+
+      if (!siblings.length) {
+        return Response.json({ error: "No siblings found" }, { status: 400 })
+      }
+
+      const currentIndex = siblings.findIndex((s: any) => s.id === id)
+      if (currentIndex === -1) {
+        return Response.json({ error: "Tier not found in siblings" }, { status: 404 })
+      }
+
+      // Remove the tier from its current position
+      const reorderedSiblings = [...siblings]
+      const [movedTier] = reorderedSiblings.splice(currentIndex, 1)
+
+      // Insert it at the new position
+      reorderedSiblings.splice(newIndex, 0, movedTier)
+
+      console.log(
+        "[v0] Siblings after reorder:",
+        reorderedSiblings.map((s: any) => ({ id: s.id, newOrder: reorderedSiblings.indexOf(s) })),
+      )
+
+      // Update display_order for all siblings
+      for (let i = 0; i < reorderedSiblings.length; i++) {
+        await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${reorderedSiblings[i].id}`
       }
     }
 

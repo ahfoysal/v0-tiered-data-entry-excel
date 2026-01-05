@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless"
 import { getCurrentUser } from "@/lib/auth"
-import bcrypt from "bcrypt"
+import bcryptjs from "bcryptjs"
 
 const sql = neon(process.env.DATABASE_URL!)
 
@@ -116,7 +116,7 @@ export async function POST(request: Request) {
               `
               updated++
             } else {
-              const hashedPassword = await bcrypt.hash("123456", 10)
+              const hashedPassword = await bcryptjs.hash("123456", 10)
               await sql`
                 INSERT INTO users (
                   employee_id,

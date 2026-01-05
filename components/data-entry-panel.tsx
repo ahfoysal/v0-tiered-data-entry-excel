@@ -5,7 +5,10 @@ import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { X, Copy, Check } from "lucide-react"
+import { EmployeeAutocomplete } from "@/components/ui/employee-autocomplete"
+import { MultiEmployeeSelect } from "@/components/ui/multi-employee-select"
 
 interface Field {
   id: string
@@ -35,6 +38,7 @@ export function DataEntryPanel({
   const [values, setValues] = useState<Record<string, string | number>>({})
   const [loading, setLoading] = useState(false)
   const [savingFieldId, setSavingFieldId] = useState<string | null>(null)
+  const [copiedFieldId, setCopiedFieldId] = useState<string | null>(null)
   const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({})
 
   useEffect(() => {
@@ -46,7 +50,6 @@ export function DataEntryPanel({
           throw new Error(`API error: ${res.status}`)
         }
 
-        // Check if response is actually JSON before parsing
         const contentType = res.headers.get("content-type")
         if (!contentType || !contentType.includes("application/json")) {
           throw new Error("Invalid response format - expected JSON")
@@ -68,7 +71,6 @@ export function DataEntryPanel({
         setValues(dataMap)
       } catch (error) {
         console.error("[v0] Failed to load tier data:", error)
-        // Fallback to tier.data if API fails
         const dataMap: Record<string, string | number> = {}
         tier.data.forEach((d) => {
           const field = fields.find((f) => f.id === d.field_id)
@@ -155,6 +157,18 @@ export function DataEntryPanel({
         delete debounceTimers.current[fieldId]
       }
     }, 500)
+  }
+
+  const handleCopyCode = async (fieldId: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopiedFieldId(fieldId)
+      toast.success("Code copied to clipboard")
+      setTimeout(() => setCopiedFieldId(null), 2000)
+    } catch (error) {
+      console.error("[v0] Copy failed:", error)
+      toast.error("Failed to copy code")
+    }
   }
 
   if (fieldLoading) {
@@ -295,6 +309,31 @@ export function DataEntryPanel({
                       onChange={(e) => handleValueChange(field.id, e.target.value, field.field_type)}
                       placeholder={`Enter ${field.field_name}`}
                     />
+                  ) : field.field_type === "code" ? (
+                    <div className="relative">
+                      <textarea
+                        id={field.id}
+                        className="w-full h-32 p-3 pr-12 border rounded-lg bg-muted text-base font-mono"
+                        value={values[field.id] as string}
+                        onChange={(e) => handleValueChange(field.id, e.target.value, field.field_type)}
+                        placeholder="Enter code snippet..."
+                        spellCheck={false}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="absolute top-2 right-2 h-8 w-8 p-0"
+                        onClick={() => handleCopyCode(field.id, (values[field.id] as string) || "")}
+                        title="Copy code"
+                      >
+                        {copiedFieldId === field.id ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   ) : field.field_type === "dropdown" ? (
                     <select
                       id={field.id}
@@ -313,6 +352,18 @@ export function DataEntryPanel({
                           </option>
                         ))}
                     </select>
+                  ) : field.field_type === "employee" ? (
+                    <EmployeeAutocomplete
+                      value={(values[field.id] as string) || ""}
+                      onChange={(value) => handleValueChange(field.id, value, field.field_type)}
+                      placeholder="Search employee by ID or name..."
+                    />
+                  ) : field.field_type === "multi-employee" ? (
+                    <MultiEmployeeSelect
+                      value={(values[field.id] as string) || ""}
+                      onChange={(value) => handleValueChange(field.id, value, field.field_type)}
+                      placeholder="Search to add employees..."
+                    />
                   ) : (
                     <Input
                       id={field.id}

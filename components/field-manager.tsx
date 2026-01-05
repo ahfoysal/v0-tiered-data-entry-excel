@@ -221,18 +221,21 @@ export function FieldManager({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="string">String</SelectItem>
+                  <SelectItem value="string">Text</SelectItem>
                   <SelectItem value="number">Number</SelectItem>
                   <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="color">Color</SelectItem>
+                  <SelectItem value="time">Time</SelectItem>
+                  <SelectItem value="datetime">Date & Time</SelectItem>
                   <SelectItem value="email">Email</SelectItem>
                   <SelectItem value="phone">Phone</SelectItem>
-                  <SelectItem value="textarea">Textarea</SelectItem>
+                  <SelectItem value="url">URL</SelectItem>
+                  <SelectItem value="color">Color</SelectItem>
                   <SelectItem value="checkbox">Checkbox</SelectItem>
                   <SelectItem value="dropdown">Dropdown</SelectItem>
-                  <SelectItem value="url">URL</SelectItem>
-                  <SelectItem value="time">Time</SelectItem>
-                  <SelectItem value="datetime">DateTime</SelectItem>
+                  <SelectItem value="textarea">Text Area</SelectItem>
+                  <SelectItem value="employee">Employee</SelectItem>
+                  <SelectItem value="multi-employee">Multi Employee</SelectItem>
+                  <SelectItem value="code">Code Snippet</SelectItem>
                 </SelectContent>
               </Select>
             </div>

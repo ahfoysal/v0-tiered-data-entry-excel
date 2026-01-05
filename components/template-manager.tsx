@@ -231,9 +231,18 @@ export function TemplateManager({ user }: { user: { is_admin: boolean } }) {
                   <option value="string">Text</option>
                   <option value="number">Number</option>
                   <option value="date">Date</option>
+                  <option value="time">Time</option>
+                  <option value="datetime">Date & Time</option>
                   <option value="email">Email</option>
+                  <option value="phone">Phone</option>
+                  <option value="url">URL</option>
+                  <option value="color">Color</option>
                   <option value="checkbox">Checkbox</option>
                   <option value="dropdown">Dropdown</option>
+                  <option value="textarea">Text Area</option>
+                  <option value="employee">Employee</option>
+                  <option value="multi-employee">Multi Employee</option>
+                  <option value="code">Code Snippet</option>
                 </select>
                 <Button onClick={handleAddField} className="gap-2">
                   <Plus className="h-4 w-4" />

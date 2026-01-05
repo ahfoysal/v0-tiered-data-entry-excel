@@ -70,7 +70,7 @@ export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: s
   const handleCreateProject = async (
     projectName: string,
     columns: string[],
-    options?: { template?: string; teamId?: string; teamSource?: string; fields?: string[] },
+    options?: { template?: string; teamId?: string; teamSource?: string; fields?: string[]; roles?: string[] },
   ) => {
     setIsCreating(true)
     setIsLoading(true)
@@ -90,6 +90,13 @@ export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: s
         payload.template = "custom"
         payload.teamSource = options.teamSource
         payload.teamId = options.teamSource === "all" ? undefined : options.teamId
+        payload.fields = options.fields
+        payload.columns = columns
+      } else if (options?.template === "role-based") {
+        payload.template = "role-based"
+        payload.teamSource = options.teamSource
+        payload.teamId = options.teamSource === "all" ? undefined : options.teamId
+        payload.roles = options.roles
         payload.fields = options.fields
         payload.columns = columns
       } else {
