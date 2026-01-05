@@ -67,13 +67,15 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card">
-        <div className="flex items-center justify-between px-6 py-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur-md sticky top-0 z-40">
+        <div className="flex items-center justify-between px-6 py-4 max-w-7xl mx-auto">
           <div>
-            <h1 className="text-2xl font-semibold">Tiered Data Entry</h1>
+            <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              Tiered Data Entry
+            </h1>
             <p className="text-sm text-muted-foreground">
-              Logged in as {user.email} {user.is_admin && "(Admin)"}
+              Logged in as {user.email} {user.is_admin && "• Admin"}
             </p>
           </div>
           <div className="flex gap-2">
@@ -94,7 +96,7 @@ export default function App() {
           </div>
         </div>
       </header>
-      <div className="p-6">
+      <div className="px-6 py-8 max-w-7xl mx-auto">
         {view === "users" ? (
           <UserManagement currentUserId={user.id} />
         ) : (

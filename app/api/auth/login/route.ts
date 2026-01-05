@@ -8,11 +8,21 @@ export async function POST(request: NextRequest) {
 
     console.log("[v0] Login attempt with email:", email)
 
-    const users = await sql`
-      SELECT id, email, is_admin, password_hash 
-      FROM users 
-      WHERE email = ${email}
-    `
+    let users
+    try {
+      users = await sql`
+        SELECT id, email, is_admin, password_hash 
+        FROM users 
+        WHERE email = ${email}
+      `
+    } catch (dbError: any) {
+      console.error("[v0] Database error:", dbError?.message)
+      // If it's a rate limit or connection error, return 503
+      if (dbError?.message?.includes("Too Many") || dbError?.message?.includes("Connection")) {
+        return NextResponse.json({ error: "Database temporarily unavailable. Please try again." }, { status: 503 })
+      }
+      throw dbError
+    }
 
     const user = users[0]
 

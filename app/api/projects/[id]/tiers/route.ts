@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { requireAuth } from "@/lib/auth"
+import { requireAuth, getCurrentUser } from "@/lib/auth"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -8,18 +8,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params
 
     const tiers = await sql`
-      SELECT t.*, 
-        COALESCE(json_agg(
-          json_build_object('field_id', td.field_id, 'value', td.value, 'text_value', td.text_value)
-        ) FILTER (WHERE td.id IS NOT NULL), '[]') as data
-      FROM tiers t
-      LEFT JOIN tier_data td ON t.id = td.tier_id
-      WHERE t.project_id = ${id}
-      GROUP BY t.id
-      ORDER BY t.level, t.created_at
+      SELECT * FROM tiers
+      WHERE project_id = ${id}
+      ORDER BY level, created_at
     `
 
-    return NextResponse.json({ tiers })
+    const tiersWithData = await Promise.all(
+      tiers.map(async (tier: any) => {
+        const tierData = await sql`
+          SELECT field_id, value, text_value FROM tier_data
+          WHERE tier_id = ${tier.id}
+        `
+        return {
+          ...tier,
+          data: tierData || [],
+        }
+      }),
+    )
+
+    return NextResponse.json({ tiers: tiersWithData })
   } catch (error) {
     console.error("[v0] Get tiers error:", error)
     return NextResponse.json({ error: "Failed to fetch tiers" }, { status: 500 })
@@ -28,12 +35,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const user = await getCurrentUser()
     await requireAuth()
     const { id } = await params
     const { name, parent_id, allow_child_creation = true } = await request.json()
 
-    // Check if parent allows child creation
-    if (parent_id) {
+    if (parent_id && !user?.is_admin) {
       const parent = await sql`
         SELECT allow_child_creation FROM tiers WHERE id = ${parent_id}
       `
