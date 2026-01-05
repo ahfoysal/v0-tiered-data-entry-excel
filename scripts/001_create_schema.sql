@@ -60,5 +60,5 @@ CREATE INDEX IF NOT EXISTS idx_project_fields_project ON project_fields(project_
 
 -- Insert default admin user (password: admin123)
 INSERT INTO users (email, password_hash, is_admin) 
-VALUES ('admin@example.com', '$2a$10$rLz8qU0Z8Y3pQv3qH3YqFOxKj7L8YrX0rGqVz8xLZ9YqF0xKj7L8Y', true)
+VALUES ('admin@example.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcg7b3XeKeUxWdeS86E36P4/KFm', true)
 ON CONFLICT (email) DO NOTHING;
