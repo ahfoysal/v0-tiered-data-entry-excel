@@ -9,32 +9,56 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const { id } = await params
-    const { newIndex, parentId } = await request.json()
+    const { newIndex, parentId, newParentId } = await request.json()
+
+    console.log("[v0] Reorder tier:", { id, newIndex, parentId, newParentId })
 
     const sql = neon(process.env.DATABASE_URL!)
 
-    const siblings = await sql`
+    const oldSiblings = await sql`
       SELECT id, display_order FROM tiers 
       WHERE parent_id IS NOT DISTINCT FROM ${parentId || null}
       ORDER BY display_order ASC
     `
 
-    if (!siblings.length) {
-      return Response.json({ error: "No siblings found" }, { status: 400 })
+    console.log("[v0] Old siblings:", oldSiblings)
+
+    if (!oldSiblings.length) {
+      return Response.json({ error: "No siblings found in old parent" }, { status: 400 })
     }
 
-    const tierIdx = siblings.findIndex((s: any) => s.id === id)
+    const tierIdx = oldSiblings.findIndex((s: any) => s.id === id)
     if (tierIdx === -1) {
-      return Response.json({ error: "Tier not found" }, { status: 404 })
+      return Response.json({ error: "Tier not found in siblings" }, { status: 404 })
     }
 
-    const newSiblings = siblings.filter((s: any) => s.id !== id)
-    newSiblings.splice(newIndex, 0, { id })
-
-    for (let i = 0; i < newSiblings.length; i++) {
-      await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${newSiblings[i].id}`
+    if (newParentId !== undefined && newParentId !== parentId) {
+      console.log("[v0] Moving tier to new parent:", newParentId)
+      await sql`UPDATE tiers SET parent_id = ${newParentId || null} WHERE id = ${id}`
     }
 
+    const updatedOldSiblings = oldSiblings.filter((s: any) => s.id !== id)
+
+    for (let i = 0; i < updatedOldSiblings.length; i++) {
+      await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${updatedOldSiblings[i].id}`
+    }
+
+    if (newParentId !== undefined && newParentId !== parentId) {
+      const newSiblings = await sql`
+        SELECT id, display_order FROM tiers 
+        WHERE parent_id IS NOT DISTINCT FROM ${newParentId || null}
+        ORDER BY display_order ASC
+      `
+
+      const reorderedNewSiblings = [...newSiblings]
+      reorderedNewSiblings.splice(newIndex, 0, { id })
+
+      for (let i = 0; i < reorderedNewSiblings.length; i++) {
+        await sql`UPDATE tiers SET display_order = ${i} WHERE id = ${reorderedNewSiblings[i].id}`
+      }
+    }
+
+    console.log("[v0] Reorder completed successfully")
     return Response.json({ success: true })
   } catch (error) {
     console.error("[v0] Reorder tier error:", error)

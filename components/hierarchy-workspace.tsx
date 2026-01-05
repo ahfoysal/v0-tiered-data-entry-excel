@@ -9,6 +9,7 @@ import { FieldManager } from "@/components/field-manager"
 import { TemplateManager } from "@/components/template-manager"
 import { BreadcrumbNavigation } from "@/components/breadcrumb-navigation"
 import { useSuccessToast } from "@/components/success-toast"
+import { useRouter } from "next/navigation"
 
 interface User {
   id: string
@@ -29,6 +30,7 @@ interface Tier {
   parent_id: string | null
   level: number
   allow_child_creation: boolean
+  is_draggable: boolean
   data: { field_id: string; value: number }[]
   children?: Tier[]
 }
@@ -38,11 +40,13 @@ export function HierarchyWorkspace({
   user,
   onBack,
   onLogout,
+  initialTierId,
 }: {
   projectId: string
   user: User
   onBack: () => void
   onLogout: () => void
+  initialTierId?: string
 }) {
   const [tiers, setTiers] = useState<Tier[]>([])
   const [selectedTier, setSelectedTier] = useState<Tier | null>(null)
@@ -56,6 +60,7 @@ export function HierarchyWorkspace({
   const [breadcrumbPath, setBreadcrumbPath] = useState<Array<{ id: string; name: string }>>([])
   const [isCreatingRootTier, setIsCreatingRootTier] = useState(false)
   const { success, error, info } = useSuccessToast()
+  const router = useRouter()
 
   const buildBreadcrumbPath = (tier: Tier, allTiers: Tier[]): Array<{ id: string; name: string }> => {
     const path: Array<{ id: string; name: string }> = []
@@ -81,8 +86,18 @@ export function HierarchyWorkspace({
     if (selectedTier) {
       loadTierFields(selectedTier.id)
       setBreadcrumbPath(buildBreadcrumbPath(selectedTier, tiers))
+      router.push(`/projects/${projectId}/tiers/${selectedTier.id}`)
     }
-  }, [selectedTier])
+  }, [selectedTier, projectId])
+
+  useEffect(() => {
+    if (initialTierId && tiers.length > 0 && !selectedTier) {
+      const tier = findTierInTree(tiers, initialTierId)
+      if (tier) {
+        setSelectedTier(tier)
+      }
+    }
+  }, [initialTierId, tiers])
 
   const loadData = async () => {
     setLoading(true)
@@ -393,6 +408,19 @@ export function HierarchyWorkspace({
                         onChange={(e) => {
                           handleUpdateTierSetting(selectedTier.id, {
                             allow_child_creation: e.target.checked,
+                          })
+                        }}
+                        className="h-4 w-4"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">Not draggable</label>
+                      <input
+                        type="checkbox"
+                        checked={!(selectedTier.is_draggable ?? true)}
+                        onChange={(e) => {
+                          handleUpdateTierSetting(selectedTier.id, {
+                            is_draggable: !e.target.checked,
                           })
                         }}
                         className="h-4 w-4"
