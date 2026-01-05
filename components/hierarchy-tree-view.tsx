@@ -1,10 +1,12 @@
 "use client"
 
+import type React from "react"
+
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit2, Check, X } from "lucide-react"
+import { ChevronRight, ChevronDown, Plus, Trash2, Edit2, Check, X, GripVertical } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Field {
@@ -20,6 +22,7 @@ interface Tier {
   parent_id: string | null
   level: number
   allow_child_creation: boolean
+  allow_field_management: boolean
   data: { field_id: string; value: number }[]
   children?: Tier[]
 }
@@ -51,7 +54,10 @@ export function HierarchyTreeView({
 }: HierarchyTreeViewProps) {
   const [showCreate, setShowCreate] = useState(false)
   const [newTierName, setNewTierName] = useState("")
-  const [allowChildCreation, setAllowChildCreation] = useState(true)
+  const [allowChildCreation, setAllowChildCreation] = useState(false)
+  const [allowFieldManagement, setAllowFieldManagement] = useState(false)
+  const [draggedTier, setDraggedTier] = useState<Tier | null>(null)
+  const [dragOverTier, setDragOverTier] = useState<Tier | null>(null)
 
   const handleCreateRootTier = async () => {
     if (!newTierName.trim()) return
@@ -64,17 +70,49 @@ export function HierarchyTreeView({
           name: newTierName.trim(),
           parent_id: null,
           allow_child_creation: allowChildCreation,
+          allow_field_management: allowFieldManagement,
         }),
       })
 
       if (res.ok) {
         setNewTierName("")
-        setAllowChildCreation(true)
+        setAllowChildCreation(false)
+        setAllowFieldManagement(false)
         setShowCreate(false)
         onUpdate()
       }
     } catch (error) {
       console.error("[v0] Create tier failed:", error)
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, tier: Tier) => {
+    setDraggedTier(tier)
+    e.dataTransfer.effectAllowed = "move"
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = "move"
+  }
+
+  const handleDrop = async (e: React.DragEvent, targetTier: Tier) => {
+    e.preventDefault()
+    if (!draggedTier || draggedTier.id === targetTier.id) return
+
+    try {
+      const res = await fetch(`/api/tiers/${draggedTier.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parent_id: targetTier.id }),
+      })
+
+      if (res.ok) {
+        setDraggedTier(null)
+        onUpdate()
+      }
+    } catch (error) {
+      console.error("[v0] Move tier failed:", error)
     }
   }
 
@@ -107,7 +145,17 @@ export function HierarchyTreeView({
               onCheckedChange={(checked) => setAllowChildCreation(checked as boolean)}
             />
             <label htmlFor="allow-child" className="text-sm cursor-pointer">
-              Allow users to create children under this tier
+              Allow users to create children
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="allow-field-mgmt"
+              checked={allowFieldManagement}
+              onCheckedChange={(checked) => setAllowFieldManagement(checked as boolean)}
+            />
+            <label htmlFor="allow-field-mgmt" className="text-sm cursor-pointer">
+              Allow users to add/remove fields
             </label>
           </div>
           <div className="flex gap-2">
@@ -139,6 +187,13 @@ export function HierarchyTreeView({
           level={0}
           fields={fields}
           user={user}
+          onDragStart={handleDragStart}
+          draggedTier={draggedTier}
+          setDraggedTier={setDraggedTier}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          dragOverTier={dragOverTier}
+          setDragOverTier={setDragOverTier}
         />
       ))}
     </div>
@@ -154,6 +209,13 @@ function TierNode({
   level,
   fields,
   user,
+  onDragStart,
+  draggedTier,
+  setDraggedTier,
+  onDragOver,
+  onDrop,
+  dragOverTier,
+  setDragOverTier,
 }: {
   tier: Tier
   selectedTier: Tier | null
@@ -163,13 +225,21 @@ function TierNode({
   level: number
   fields: Field[]
   user: User
+  onDragStart: (e: React.DragEvent, tier: Tier) => void
+  draggedTier: Tier | null
+  setDraggedTier: (tier: Tier | null) => void
+  onDragOver: (e: React.DragEvent) => void
+  onDrop: (e: React.DragEvent, tier: Tier) => void
+  dragOverTier: Tier | null
+  setDragOverTier: (tier: Tier | null) => void
 }) {
   const [isExpanded, setIsExpanded] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(tier.name)
   const [showCreate, setShowCreate] = useState(false)
   const [newChildName, setNewChildName] = useState("")
-  const [allowChildCreation, setAllowChildCreation] = useState(true)
+  const [allowChildCreation, setAllowChildCreation] = useState(false)
+  const [allowFieldManagement, setAllowFieldManagement] = useState(false)
 
   const hasChildren = tier.children && tier.children.length > 0
   const isSelected = selectedTier?.id === tier.id
@@ -207,13 +277,15 @@ function TierNode({
           name: newChildName.trim(),
           parent_id: tier.id,
           allow_child_creation: allowChildCreation,
+          allow_field_management: allowFieldManagement,
         }),
       })
 
       const data = await res.json()
       if (res.ok) {
         setNewChildName("")
-        setAllowChildCreation(true)
+        setAllowChildCreation(false)
+        setAllowFieldManagement(false)
         setShowCreate(false)
         onUpdate()
       } else {
@@ -243,12 +315,25 @@ function TierNode({
   return (
     <div>
       <div
+        draggable
+        onDragStart={(e) => onDragStart(e, tier)}
+        onDragOver={onDragOver}
+        onDragEnter={() => setDragOverTier(tier)}
+        onDragLeave={() => setDragOverTier(null)}
+        onDrop={(e) => onDrop(e, tier)}
         className={cn(
           "group flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-accent transition-colors",
           isSelected && "bg-primary text-primary-foreground hover:bg-primary",
+          draggedTier?.id === tier.id && "opacity-50",
+          dragOverTier?.id === tier.id && "ring-2 ring-primary",
+          user.is_admin ? "cursor-grab active:cursor-grabbing" : "",
         )}
         style={{ paddingLeft: `${level * 1.5 + 0.75}rem` }}
       >
+        {user.is_admin && (
+          <GripVertical className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+        )}
+
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex h-4 w-4 items-center justify-center shrink-0"
@@ -365,16 +450,28 @@ function TierNode({
             onKeyDown={(e) => e.key === "Enter" && handleCreateChild()}
           />
           {user.is_admin && (
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={`allow-child-${tier.id}`}
-                checked={allowChildCreation}
-                onCheckedChange={(checked) => setAllowChildCreation(checked as boolean)}
-              />
-              <label htmlFor={`allow-child-${tier.id}`} className="text-sm cursor-pointer">
-                Allow creating children under this tier
-              </label>
-            </div>
+            <>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`allow-child-${tier.id}`}
+                  checked={allowChildCreation}
+                  onCheckedChange={(checked) => setAllowChildCreation(checked as boolean)}
+                />
+                <label htmlFor={`allow-child-${tier.id}`} className="text-sm cursor-pointer">
+                  Allow creating children
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id={`allow-field-mgmt-${tier.id}`}
+                  checked={allowFieldManagement}
+                  onCheckedChange={(checked) => setAllowFieldManagement(checked as boolean)}
+                />
+                <label htmlFor={`allow-field-mgmt-${tier.id}`} className="text-sm cursor-pointer">
+                  Allow users to add/remove fields
+                </label>
+              </div>
+            </>
           )}
           <div className="flex gap-2">
             <Button onClick={handleCreateChild} size="sm" className="flex-1">
@@ -400,6 +497,13 @@ function TierNode({
               level={level + 1}
               fields={fields}
               user={user}
+              onDragStart={onDragStart}
+              draggedTier={draggedTier}
+              setDraggedTier={setDraggedTier}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
+              dragOverTier={dragOverTier}
+              setDragOverTier={setDragOverTier}
             />
           ))}
         </div>

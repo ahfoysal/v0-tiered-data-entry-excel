@@ -1,7 +1,5 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -100,13 +98,14 @@ export function FieldManager({
               className="flex-1"
             />
             <Select value={newFieldType} onValueChange={setNewFieldType} disabled={loading}>
-              <SelectTrigger className="w-32">
+              <SelectTrigger className="w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="number">Number</SelectItem>
                 <SelectItem value="string">String</SelectItem>
                 <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="color">Color</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleAddField} disabled={loading || !newFieldName.trim()} className="gap-2">
@@ -146,13 +145,5 @@ export function FieldManager({
         </div>
       </Card>
     </div>
-  )
-}
-
-function Label({ children, className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) {
-  return (
-    <label className={className} {...props}>
-      {children}
-    </label>
   )
 }

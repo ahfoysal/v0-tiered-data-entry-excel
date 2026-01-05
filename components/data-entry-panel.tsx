@@ -19,6 +19,7 @@ interface Tier {
   parent_id: string | null
   level: number
   allow_child_creation: boolean
+  background_color?: string
   data: { field_id: string; value: number | null; text_value: string | null }[]
   children?: Tier[]
 }
@@ -26,20 +27,24 @@ interface Tier {
 export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields: Field[]; onUpdate: () => void }) {
   const [values, setValues] = useState<Record<string, string | number>>({})
   const [allowChildCreation, setAllowChildCreation] = useState(tier.allow_child_creation)
+  const [selectedColorField, setSelectedColorField] = useState<string>("")
+  const [tierFields, setTierFields] = useState<Field[]>(fields)
 
   useEffect(() => {
     const dataMap: Record<string, string | number> = {}
     tier.data.forEach((d) => {
-      const field = fields.find((f) => f.id === d.field_id)
+      const field = tierFields.find((f) => f.id === d.field_id)
       if (field?.field_type === "number") {
         dataMap[d.field_id] = d.value ?? 0
+      } else if (field?.field_type === "color") {
+        dataMap[d.field_id] = d.text_value ?? "#000000"
       } else {
         dataMap[d.field_id] = d.text_value ?? ""
       }
     })
     setValues(dataMap)
     setAllowChildCreation(tier.allow_child_creation)
-  }, [tier, fields])
+  }, [tier, tierFields])
 
   const hasChildren = tier.children && tier.children.length > 0
 
@@ -47,7 +52,7 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
     if (!t.children || t.children.length === 0) {
       const result: Record<string, string | number> = {}
       t.data.forEach((d) => {
-        const field = fields.find((f) => f.id === d.field_id)
+        const field = tierFields.find((f) => f.id === d.field_id)
         if (field?.field_type === "number") {
           result[d.field_id] = d.value ?? 0
         } else {
@@ -61,9 +66,11 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
     t.children.forEach((child) => {
       const childData = calculateAggregatedData(child)
       Object.entries(childData).forEach(([fieldId, value]) => {
-        const field = fields.find((f) => f.id === fieldId)
+        const field = tierFields.find((f) => f.id === fieldId)
         if (field?.field_type === "number") {
           aggregated[fieldId] = ((aggregated[fieldId] as number) || 0) + (value as number)
+        } else if (field?.field_type === "color") {
+          aggregated[fieldId] = value
         } else {
           aggregated[fieldId] = `${t.children!.length} items`
         }
@@ -108,9 +115,12 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
     }
   }
 
+  const colorField = tierFields.find((f) => f.field_type === "color" && values[f.id])
+  const tierBgColor = colorField ? (values[colorField.id] as string) : "transparent"
+
   return (
     <div className="max-w-3xl">
-      <Card className="p-6">
+      <Card className="p-6" style={{ backgroundColor: tierBgColor, opacity: 0.1 }}>
         <div className="mb-6">
           <h2 className="text-2xl font-semibold mb-1">{tier.name}</h2>
           <p className="text-sm text-muted-foreground">
@@ -133,7 +143,7 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
           </div>
         </div>
 
-        {fields.length === 0 ? (
+        {tierFields.length === 0 ? (
           <Card className="p-8 text-center bg-secondary">
             <p className="text-muted-foreground">No fields defined yet. Admin users can add fields.</p>
           </Card>
@@ -141,7 +151,7 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
           <div className="space-y-4">
             <Label className="text-sm font-medium">Data Fields</Label>
             <div className="grid grid-cols-2 gap-4">
-              {fields.map((field) => (
+              {tierFields.map((field) => (
                 <div key={field.id} className="space-y-1.5">
                   <Label htmlFor={field.id} className="text-xs text-muted-foreground">
                     {field.field_name}
@@ -153,13 +163,26 @@ export function DataEntryPanel({ tier, fields, onUpdate }: { tier: Tier; fields:
                       <span className="text-xs text-muted-foreground ml-2">(calculated)</span>
                     </div>
                   ) : (
-                    <Input
-                      id={field.id}
-                      type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
-                      value={values[field.id] ?? (field.field_type === "number" ? 0 : "")}
-                      onChange={(e) => handleValueChange(field.id, e.target.value, field.field_type)}
-                      placeholder={field.field_type === "number" ? "0" : `Enter ${field.field_name}`}
-                    />
+                    <>
+                      {field.field_type === "color" ? (
+                        <Input
+                          id={field.id}
+                          type="color"
+                          value={(values[field.id] as string) || "#000000"}
+                          onChange={(e) => handleValueChange(field.id, e.target.value, field.field_type)}
+                        />
+                      ) : (
+                        <Input
+                          id={field.id}
+                          type={
+                            field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"
+                          }
+                          value={values[field.id] ?? (field.field_type === "number" ? 0 : "")}
+                          onChange={(e) => handleValueChange(field.id, e.target.value, field.field_type)}
+                          placeholder={field.field_type === "number" ? "0" : `Enter ${field.field_name}`}
+                        />
+                      )}
+                    </>
                   )}
                 </div>
               ))}
