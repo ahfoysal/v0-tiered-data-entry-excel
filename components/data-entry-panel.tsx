@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -119,6 +120,9 @@ export function DataEntryPanel({
       console.log("[v0] Field change detected:", { fieldId, value, fieldType })
       setSavingFieldId(fieldId)
 
+      const field = fields.find((f) => f.id === fieldId)
+      const fieldName = field?.field_name || "Field"
+
       try {
         const body =
           fieldType === "number"
@@ -137,9 +141,15 @@ export function DataEntryPanel({
         console.log("[v0] Save response:", { ok: res.ok, status: res.status, data })
 
         if (!res.ok) throw new Error(data.error || "Failed to save")
+
+        toast.success(`${fieldName} is updated`, {
+          duration: 2000,
+        })
       } catch (error) {
         console.error("[v0] Update data failed:", error)
-        alert("Failed to save. Please try again.")
+        toast.error(`Failed to update ${fieldName}`, {
+          duration: 2000,
+        })
       } finally {
         setSavingFieldId(null)
         delete debounceTimers.current[fieldId]
@@ -159,7 +169,7 @@ export function DataEntryPanel({
 
   return (
     <div className="max-w-3xl">
-      <Card className="p-6" style={{ backgroundColor: tierBgColor ? `${tierBgColor}15` : "transparent" }}>
+      <Card className="p-6">
         <div className="mb-6">
           <h2 className="text-2xl font-semibold mb-1">{tier.name}</h2>
           <p className="text-sm text-muted-foreground">
@@ -168,9 +178,9 @@ export function DataEntryPanel({
         </div>
 
         {fields.length === 0 ? (
-          <Card className="p-8 text-center bg-secondary">
+          <div className="text-center py-6">
             <p className="text-muted-foreground">No fields defined yet. Only admins can add fields.</p>
-          </Card>
+          </div>
         ) : (
           <div className="space-y-4">
             <Label className="text-sm font-medium">Data Fields</Label>

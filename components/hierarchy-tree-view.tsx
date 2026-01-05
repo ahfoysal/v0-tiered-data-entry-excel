@@ -579,6 +579,9 @@ function TierNode({
               style={tierColor ? { backgroundColor: tierColor, color: getContrastColor(tierColor) } : {}}
             >
               {tier.name}
+              {tier.children && tier.children.length > 0 && (
+                <span className="ml-2 text-xs opacity-60 font-normal">({tier.children.length})</span>
+              )}
             </button>
 
             <div
