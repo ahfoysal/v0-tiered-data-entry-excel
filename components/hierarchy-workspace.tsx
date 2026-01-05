@@ -1,9 +1,9 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@chakra-ui/react"
-import { Plus, ChevronLeft } from "react-feather"
-import type { User } from "@/types" // Assuming User type is defined in "@/types"
+import { Button } from "@/components/ui/button"
+import { Plus, ChevronLeft } from "lucide-react"
+import type { User } from "@/types"
 
 export function HierarchyWorkspace({
   projectId,
@@ -37,7 +37,7 @@ export function HierarchyWorkspace({
             disabled={isCreatingRootTier || isLoading}
             className="gap-1 bg-transparent"
           >
-            <Plus className="h-3 w-3" />
+            <Plus className="h-4 w-4" />
             {isCreatingRootTier
               ? selectedTier
                 ? "Creating Child..."
@@ -47,7 +47,7 @@ export function HierarchyWorkspace({
                 : "Add Root Tier"}
           </Button>
         )}
-        <Button onClick={onBack} variant="ghost" size="sm" className="h-6 w-6 p-0">
+        <Button onClick={onBack} variant="ghost" size="icon-sm">
           <ChevronLeft className="h-4 w-4" />
         </Button>
       </div>
