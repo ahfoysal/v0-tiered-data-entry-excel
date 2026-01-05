@@ -1,21 +1,28 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { cookies } from "next/headers"
+import bcrypt from "bcryptjs"
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
 
-    // Simple authentication (in production, use proper password hashing)
     const users = await sql`
-      SELECT id, email, is_admin, password_hash 
+      SELECT id, email, is_admin, password 
       FROM users 
       WHERE email = ${email}
     `
 
     const user = users[0]
 
-    if (!user || password !== "admin123") {
+    if (!user) {
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
+    }
+
+    // Verify password using bcrypt
+    const isValidPassword = await bcrypt.compare(password, user.password)
+
+    if (!isValidPassword) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 })
     }
 
