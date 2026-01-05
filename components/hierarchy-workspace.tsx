@@ -232,8 +232,16 @@ export function HierarchyWorkspace({
       })
 
       if (res.ok) {
+        const data = await res.json()
         success("Tier created", "New root tier created successfully")
-        loadData()
+        await loadData()
+        if (data.tier?.id) {
+          const newTiers = await (await fetch(`/api/projects/${projectId}/tiers`)).json()
+          const tier = findTierInTree(buildTree(newTiers.tiers || []), data.tier.id)
+          if (tier) {
+            setSelectedTier(tier)
+          }
+        }
       } else {
         error("Failed to create tier", "Please try again")
       }
@@ -368,12 +376,14 @@ export function HierarchyWorkspace({
               </div>
             </div>
             <HierarchyTreeView
-              tiers={tiers}
-              selectedTier={selectedTier}
-              onSelectTier={setSelectedTier}
               projectId={projectId}
+              tiers={tiers}
+              selectedTierId={selectedTier?.id || null}
+              onSelectTier={(tierId) => {
+                const tier = findTierInTree(tiers, tierId)
+                if (tier) setSelectedTier(tier)
+              }}
               onUpdate={loadData}
-              fields={tierFields}
               user={user}
             />
           </div>

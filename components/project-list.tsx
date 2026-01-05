@@ -3,11 +3,10 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Plus, Zap, Copy, Trash2, Calendar, UserIcon, Sparkles } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Plus, Copy, Trash2, Calendar, UserIcon, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { useLoading } from "@/contexts/loading-context"
+import { ProjectSetup } from "@/components/project-setup"
 
 interface Project {
   id: string
@@ -47,9 +46,7 @@ const TEMPLATES = {
 export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: string) => void; user: AppUser }) {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
-  const [showCreate, setShowCreate] = useState(false)
-  const [newProjectName, setNewProjectName] = useState("")
-  const [selectedTemplate, setSelectedTemplate] = useState<keyof typeof TEMPLATES>("blank")
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const { isLoading: globalLoading, setIsLoading } = useLoading()
 
@@ -70,30 +67,46 @@ export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: s
     }
   }
 
-  const handleCreateProject = async () => {
-    if (!newProjectName.trim()) return
-
+  const handleCreateProject = async (
+    projectName: string,
+    columns: string[],
+    options?: { template?: string; teamId?: string; teamSource?: string; fields?: string[] },
+  ) => {
     setIsCreating(true)
     setIsLoading(true)
-    const toastId = toast.loading(`Creating project "${newProjectName}"...`)
+    const toastId = toast.loading(`Creating project "${projectName}"...`)
 
     try {
+      const payload: any = {
+        name: projectName.trim(),
+      }
+
+      if (options?.template === "team-based") {
+        payload.template = "team-based"
+        payload.teamId = options.teamId
+        payload.fields = options.fields
+        payload.columns = columns
+      } else if (options?.template === "custom") {
+        payload.template = "custom"
+        payload.teamSource = options.teamSource
+        payload.teamId = options.teamSource === "all" ? undefined : options.teamId
+        payload.fields = options.fields
+        payload.columns = columns
+      } else {
+        payload.templateFields = TEMPLATES["blank"].fields
+      }
+
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newProjectName.trim(),
-          templateFields: TEMPLATES[selectedTemplate].fields,
-        }),
+        body: JSON.stringify(payload),
       })
 
       const data = await res.json()
       if (data.project) {
         await loadProjects()
-        setNewProjectName("")
-        setSelectedTemplate("blank")
-        setShowCreate(false)
-        toast.success(`Project "${newProjectName}" created successfully! 🎉`, {
+        setShowCreateModal(false)
+        toast.success(`Project "${projectName}" created successfully! 🎉`, {
           id: toastId,
         })
       } else {
@@ -180,7 +193,7 @@ export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: s
             <p className="text-muted-foreground mt-1">Manage and organize your data entry projects</p>
           </div>
           <Button
-            onClick={() => setShowCreate(!showCreate)}
+            onClick={() => setShowCreateModal(true)}
             disabled={globalLoading}
             className="gap-2 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -191,59 +204,12 @@ export function ProjectList({ onSelectProject, user }: { onSelectProject: (id: s
       </div>
 
       {/* Create Project Section */}
-      {showCreate && (
-        <Card className="p-6 mb-6 border border-primary/20 bg-gradient-to-r from-primary/5 to-accent/5">
-          <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Create New Project
-          </h3>
-          <div className="space-y-4">
-            <Input
-              placeholder="Project name (e.g., Q1 Sales Pipeline)"
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreateProject()}
-              disabled={globalLoading}
-              className="bg-background/50 border-border/50 h-11 disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-            <Select
-              value={selectedTemplate}
-              onValueChange={(v) => setSelectedTemplate(v as keyof typeof TEMPLATES)}
-              disabled={globalLoading}
-            >
-              <SelectTrigger className="bg-background/50 border-border/50 h-11 disabled:opacity-50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="blank">Blank Project</SelectItem>
-                <SelectItem value="attendance">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Attendance Tracker
-                  </div>
-                </SelectItem>
-                <SelectItem value="taskManagement">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    Task Management
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="flex gap-2">
-              <Button
-                onClick={handleCreateProject}
-                disabled={globalLoading || isCreating || !newProjectName.trim()}
-                className="bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {globalLoading || isCreating ? "Creating..." : "Create Project"}
-              </Button>
-              <Button onClick={() => setShowCreate(false)} variant="outline" disabled={globalLoading}>
-                Cancel
-              </Button>
-            </div>
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <ProjectSetup onCreateProject={handleCreateProject} />
           </div>
-        </Card>
+        </div>
       )}
 
       {/* Projects Grid */}

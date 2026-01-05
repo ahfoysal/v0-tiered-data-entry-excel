@@ -2,18 +2,36 @@ import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { requireAuth, getCurrentUser } from "@/lib/auth"
 
+const MAX_RETRIES = 3
+const RETRY_DELAY = 1000 // 1 second initial delay
+
+async function executeWithRetry<T>(fn: () => Promise<T>, retries = MAX_RETRIES): Promise<T> {
+  try {
+    return await fn()
+  } catch (error: any) {
+    if (error.message?.includes("Too Many Requests") && retries > 0) {
+      const delay = RETRY_DELAY * (MAX_RETRIES - retries + 1)
+      console.log(`[v0] Rate limited, retrying after ${delay}ms...`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      return executeWithRetry(fn, retries - 1)
+    }
+    throw error
+  }
+}
+
 export async function GET() {
   try {
     await requireAuth()
 
-    // Get all templates (system templates + user templates)
-    const templates = await sql`
-      SELECT ft.*, COUNT(tf.id)::integer as field_count
-      FROM field_templates ft
-      LEFT JOIN template_fields tf ON ft.id = tf.template_id
-      GROUP BY ft.id
-      ORDER BY ft.is_system DESC, ft.created_at DESC
-    `
+    const templates = await executeWithRetry(async () => {
+      return await sql`
+        SELECT ft.*, COUNT(tf.id)::integer as field_count
+        FROM field_templates ft
+        LEFT JOIN template_fields tf ON ft.id = tf.template_id
+        GROUP BY ft.id
+        ORDER BY ft.is_system DESC, ft.created_at DESC
+      `
+    })
 
     return NextResponse.json({ templates })
   } catch (error) {
@@ -36,7 +54,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Template name required" }, { status: 400 })
     }
 
-    // Create template
     const result = await sql`
       INSERT INTO field_templates (name, description, created_by, is_system)
       VALUES (${name}, ${description || null}, ${user?.id || null}, false)
@@ -45,7 +62,6 @@ export async function POST(request: NextRequest) {
 
     const templateId = result[0].id
 
-    // Add fields
     if (fields && fields.length > 0) {
       for (let i = 0; i < fields.length; i++) {
         const field = fields[i]

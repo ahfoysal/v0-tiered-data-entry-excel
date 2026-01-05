@@ -5,28 +5,32 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ChevronRight, ChevronDown, Plus, Trash2, Edit2, ArrowUp, ArrowDown, ArrowRight, ArrowLeft } from "lucide-react"
+import {
+  ChevronRight,
+  ChevronDown,
+  Plus,
+  Trash2,
+  Copy,
+  Edit2,
+  Check,
+  X,
+  ArrowUp,
+  ArrowDown,
+  ArrowRight,
+  ArrowLeft,
+} from "lucide-react"
+import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { useLoading } from "@/contexts/loading-context"
+import type { Tier } from "@/types"
+import { getTierColor } from "@/utils/getTierColor" // Import getTierColor function
 
 interface Field {
   id: string
   field_name: string
   field_type: string
   display_order: number
-}
-
-interface Tier {
-  id: string
-  name: string
-  parent_id: string | null
-  level: number
-  allow_child_creation: boolean
-  allow_field_management: boolean
-  is_draggable?: boolean
-  data: { field_id: string; value: number }[]
-  children?: Tier[]
 }
 
 interface User {
@@ -36,22 +40,20 @@ interface User {
 }
 
 interface HierarchyTreeViewProps {
-  tiers: Tier[]
-  selectedTier: Tier | null
-  onSelectTier: (tier: Tier) => void
   projectId: string
+  tiers: Tier[]
+  selectedTierId: string | null
+  onSelectTier: (tierId: string) => void
   onUpdate: () => void
-  fields: Field[]
   user: User
 }
 
 export function HierarchyTreeView({
-  tiers,
-  selectedTier,
-  onSelectTier,
   projectId,
+  tiers,
   onUpdate,
-  fields,
+  selectedTierId,
+  onSelectTier,
   user,
 }: HierarchyTreeViewProps) {
   const [showCreate, setShowCreate] = useState(false)
@@ -62,6 +64,7 @@ export function HierarchyTreeView({
   const [dragOverTier, setDragOverTier] = useState<Tier | null>(null)
   const [dragDirection, setDragDirection] = useState<"above" | "below" | null>(null)
   const { isLoading } = useLoading()
+  const router = useRouter()
 
   const [expandedTiers, setExpandedTiers] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
@@ -85,14 +88,6 @@ export function HierarchyTreeView({
       newExpanded.add(tierId)
     }
     setExpandedTiers(newExpanded)
-  }
-
-  const getTierColor = (tier: Tier) => {
-    const colorField = fields.find((f) => f.field_type === "color")
-    if (!colorField) return undefined
-
-    const colorData = tier.data?.find((d) => d.field_id === colorField.id)
-    return colorData?.value as string | undefined
   }
 
   const handleCreateRootTier = async () => {
@@ -291,74 +286,57 @@ export function HierarchyTreeView({
         <TierNode
           key={tier.id}
           tier={tier}
-          selectedTier={selectedTier}
+          selectedTierId={selectedTierId}
           onSelectTier={onSelectTier}
-          projectId={projectId}
           onUpdate={onUpdate}
-          level={0}
-          fields={fields}
           user={user}
-          onDragStart={handleDragStart}
-          draggedTier={draggedTier}
-          setDraggedTier={setDraggedTier}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          dragOverTier={dragOverTier}
-          setDragOverTier={setDragOverTier}
-          dragDirection={dragDirection}
-          setDragDirection={setDragDirection}
-          handleDragEnd={handleDragEnd}
-          isExpanded={expandedTiers.has(tier.id)}
+          projectId={projectId}
           onToggleExpanded={toggleExpanded}
+          expandedTiers={expandedTiers}
+          handleDragStart={handleDragStart}
+          handleDragOver={handleDragOver}
+          handleDrop={handleDrop}
+          handleDragEnd={handleDragEnd}
+          tiers={tiers} // Added tiers prop for reorder functions
         />
       ))}
     </div>
   )
 }
 
+interface TierNodeProps {
+  tier: Tier
+  level?: number
+  selectedTierId: string | null
+  onSelectTier: (tierId: string) => void
+  onUpdate: () => void
+  user: User
+  projectId: string
+  onToggleExpanded: (tierId: string) => void
+  expandedTiers: Set<string>
+  handleDragStart: (e: React.DragEvent, tier: Tier) => void
+  handleDragOver: (e: React.DragEvent, tier: Tier) => void
+  handleDrop: (e: React.DragEvent, targetTier: Tier) => void
+  handleDragEnd: () => void
+  tiers: Tier[] // Added tiers prop for reorder functions
+}
+
 function TierNode({
   tier,
-  selectedTier,
+  level = 0,
+  selectedTierId,
   onSelectTier,
-  projectId,
   onUpdate,
-  level,
-  fields,
   user,
-  onDragStart,
-  draggedTier,
-  setDraggedTier,
-  onDragOver,
-  onDrop,
-  dragOverTier,
-  setDragOverTier,
-  dragDirection,
-  setDragDirection,
-  handleDragEnd,
-  isExpanded,
+  projectId,
   onToggleExpanded,
-}: {
-  tier: Tier
-  selectedTier: Tier | null
-  onSelectTier: (tier: Tier) => void
-  projectId: string
-  onUpdate: () => void
-  level: number
-  fields: Field[]
-  user: User
-  onDragStart: (e: React.DragEvent, tier: Tier) => void
-  draggedTier: Tier | null
-  setDraggedTier: (tier: Tier | null) => void
-  onDragOver: (e: React.DragEvent, tier: Tier) => void
-  onDrop: (e: React.DragEvent, tier: Tier) => void
-  dragOverTier: Tier | null
-  setDragOverTier: (tier: Tier | null) => void
-  dragDirection: "above" | "below" | null
-  setDragDirection: (direction: "above" | "below" | null) => void
-  handleDragEnd: () => void
-  isExpanded: boolean
-  onToggleExpanded: (tierId: string) => void
-}) {
+  expandedTiers,
+  handleDragStart,
+  handleDragOver,
+  handleDrop,
+  handleDragEnd,
+  tiers, // Added tiers to destructuring
+}: TierNodeProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editName, setEditName] = useState(tier.name)
   const [showCreate, setShowCreate] = useState(false)
@@ -373,14 +351,10 @@ function TierNode({
   const { isLoading, setIsLoading } = useLoading()
 
   const hasChildren = tier.children && tier.children.length > 0
-  const isSelected = selectedTier?.id === tier.id
+  const isSelected = selectedTierId === tier.id
+  const isExpanded = expandedTiers.has(tier.id)
 
-  const tierColor = (() => {
-    const colorField = fields.find((f) => f.field_type === "color")
-    if (!colorField) return undefined
-    const colorData = tier.data?.find((d) => d.field_id === colorField.id)
-    return colorData?.value as string | undefined
-  })()
+  const tierColor = getTierColor(tier)
 
   const handleUpdateName = async () => {
     if (!editName.trim() || editName === tier.name) {
@@ -426,13 +400,21 @@ function TierNode({
   const handleCreateChild = async () => {
     if (!newChildName.trim()) return
 
+    if (!tier?.id) {
+      toast.error("Cannot create tier", {
+        description: "Parent tier ID is missing",
+      })
+      return
+    }
+
     setIsCreatingChild(true)
-    console.log("[v0] handleCreateChild called with name:", newChildName)
+    console.log("[v0] handleCreateChild called with name:", newChildName, "parent_id:", tier.id)
     const toastId = toast.loading(`Creating tier "${newChildName}"...`)
 
     try {
-      console.log("[v0] Sending POST to /api/projects/${projectId}/tiers")
-      const res = await fetch(`/api/projects/${projectId}/tiers`, {
+      const url = `/api/projects/${projectId}/tiers`
+      console.log("[v0] Sending POST to", url, "with parent_id:", tier.id)
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -443,12 +425,9 @@ function TierNode({
         }),
       })
 
-      console.log("[v0] Response status:", res.status)
       const data = await res.json()
-      console.log("[v0] Response data:", data)
 
       if (res.ok) {
-        console.log("[v0] Create successful, dismissing loading toast")
         toast.dismiss(toastId)
         toast.success(`Tier "${newChildName}" created`, {
           description: "Child tier added successfully",
@@ -458,9 +437,12 @@ function TierNode({
         setAllowFieldManagement(false)
         setShowCreate(false)
         setIsCreatingChild(false)
+        if (data.tier?.id) {
+          onToggleExpanded(tier.id)
+          onSelectTier(data.tier.id)
+        }
         onUpdate()
       } else {
-        console.log("[v0] Create failed with error:", data.error)
         toast.dismiss(toastId)
         toast.error("Failed to create tier", {
           description: data.error || "Please try again",
@@ -521,17 +503,25 @@ function TierNode({
         method: "POST",
       })
 
+      const data = await res.json()
+
       if (res.ok) {
         toast.dismiss(toastId)
         toast.success(`Tier duplicated`, {
           description: `"${tier.name} Copy" created successfully`,
         })
+        if (data.tier?.id) {
+          if (tier.parent_id) {
+            onToggleExpanded(tier.parent_id)
+          }
+          onSelectTier(data.tier.id)
+        }
         setIsDuplicating(false)
         onUpdate()
       } else {
         toast.dismiss(toastId)
         toast.error("Failed to duplicate tier", {
-          description: "Please try again",
+          description: data.error || "Please try again",
         })
         setIsDuplicating(false)
       }
@@ -546,13 +536,9 @@ function TierNode({
   }
 
   const handleMoveUp = async () => {
-    const siblings = (
-      tier.parent_id
-        ? window.tiers.filter((t) => t.parent_id === tier.parent_id)
-        : window.tiers.filter((t) => !t.parent_id)
-    ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-
-    const currentIndex = siblings.findIndex((s) => s.id === tier.id)
+    const parentTier = tier.parent_id ? tiers.find((t) => t.id === tier.parent_id) : null
+    const siblings = parentTier ? parentTier.children : tiers.filter((t) => !t.parent_id)
+    const currentIndex = siblings.findIndex((s: Tier) => s.id === tier.id)
     if (currentIndex <= 0) return
 
     const newIndex = currentIndex - 1
@@ -584,13 +570,9 @@ function TierNode({
   }
 
   const handleMoveDown = async () => {
-    const siblings = (
-      tier.parent_id
-        ? window.tiers.filter((t) => t.parent_id === tier.parent_id)
-        : window.tiers.filter((t) => !t.parent_id)
-    ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-
-    const currentIndex = siblings.findIndex((s) => s.id === tier.id)
+    const parentTier = tier.parent_id ? tiers.find((t) => t.id === tier.parent_id) : null
+    const siblings = parentTier ? parentTier.children : tiers.filter((t) => !t.parent_id)
+    const currentIndex = siblings.findIndex((s: Tier) => s.id === tier.id)
     if (currentIndex >= siblings.length - 1) return
 
     const newIndex = currentIndex + 1
@@ -622,13 +604,9 @@ function TierNode({
   }
 
   const handleIndent = async () => {
-    const siblings = (
-      tier.parent_id
-        ? window.tiers.filter((t) => t.parent_id === tier.parent_id)
-        : window.tiers.filter((t) => !t.parent_id)
-    ).sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
-
-    const currentIndex = siblings.findIndex((s) => s.id === tier.id)
+    const parentTier = tier.parent_id ? tiers.find((t) => t.id === tier.parent_id) : null
+    const siblings = parentTier ? parentTier.children : tiers.filter((t) => !t.parent_id)
+    const currentIndex = siblings.findIndex((s: Tier) => s.id === tier.id)
     if (currentIndex === 0) {
       toast.error("Cannot indent first tier")
       return
@@ -669,17 +647,20 @@ function TierNode({
       return
     }
 
-    const parent = window.tiers.find((t) => t.id === tier.parent_id)
+    const parent = tiers.find((t) => t.id === tier.parent_id)
     if (!parent || !parent.parent_id) {
       toast.error("Cannot dedent to root level")
       return
     }
 
-    const siblings = window.tiers
-      .filter((t) => t.parent_id === parent.parent_id)
-      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+    const grandparent = tiers.find((t) => t.id === parent.parent_id)
+    if (!grandparent) {
+      toast.error("Cannot find parent tier")
+      return
+    }
 
-    const parentIndex = siblings.findIndex((s) => s.id === parent.id)
+    const siblings = grandparent.children || []
+    const parentIndex = siblings.findIndex((s: Tier) => s.id === parent.id)
     const newIndex = parentIndex + 1
 
     setIsLoading(true)
@@ -711,234 +692,255 @@ function TierNode({
   }
 
   return (
-    <div className="space-y-1">
-      <div
-        className={cn(
-          "flex items-center gap-1 p-2 rounded hover:bg-accent/50 group relative",
-          isSelected && "bg-primary/10 border-l-2 border-primary",
-        )}
-        onDragStart={(e) => onDragStart(e, tier)}
-        onDragOver={(e) => onDragOver(e, tier)}
-        onDrop={(e) => onDrop(e, tier)}
-        onDragEnd={handleDragEnd}
-        draggable={tier.is_draggable ?? true}
-        style={{ paddingLeft: `${level * 16}px` }}
-      >
-        {hasChildren && (
-          <button onClick={() => onToggleExpanded(tier.id)} className="p-0.5 hover:bg-accent rounded">
-            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </button>
-        )}
-        {!hasChildren && <div className="w-5" />}
+    <div className="relative">
+      {level > 0 && (
+        <div
+          className="absolute left-2 top-0 bottom-0 border-l border-border"
+          style={{
+            height: "100%",
+            top: "-8px",
+          }}
+        />
+      )}
 
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onSelectTier(tier)}>
-          {isEditing ? (
-            <Input
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onBlur={handleUpdateName}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleUpdateName()
-                if (e.key === "Escape") {
-                  setEditName(tier.name)
-                  setIsEditing(false)
-                }
+      <div className="flex gap-1 relative">
+        {/* Horizontal connector from vertical line */}
+        {level > 0 && (
+          <div
+            className="absolute left-2 top-6 border-t border-border"
+            style={{
+              width: "12px",
+              height: "1px",
+            }}
+          />
+        )}
+
+        <div className="flex-shrink-0 w-6 flex items-center justify-center relative">
+          {tier.children && tier.children.length > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleExpanded(tier.id)
               }}
-              disabled={isLoading || isRenaming}
-              autoFocus
-              className="h-7"
-            />
+              className="flex-shrink-0 w-5 h-5 flex items-center justify-center hover:bg-primary/10 rounded transition-all duration-200 text-primary hover:scale-110"
+              title="Toggle children"
+            >
+              {expandedTiers.has(tier.id) ? (
+                <ChevronDown className="h-5 w-5 font-bold" />
+              ) : (
+                <ChevronRight className="h-5 w-5 font-bold" />
+              )}
+            </button>
+          )}
+          {!tier.children || (tier.children.length === 0 && <div className="flex-shrink-0 w-5" />)}
+        </div>
+
+        <div
+          className={cn(
+            "flex-1 rounded-md px-2 py-1.5 cursor-pointer group relative",
+            isSelected ? "bg-primary text-primary-foreground" : "hover:bg-muted/50",
+          )}
+          onClick={() => onSelectTier(tier.id)}
+          onDoubleClick={() => setIsEditing(true)}
+          onDragStart={(e) => handleDragStart(e, tier)}
+          onDragOver={(e) => handleDragOver(e, tier)}
+          onDrop={(e) => handleDrop(e, tier)}
+          onDragEnd={handleDragEnd}
+          draggable={tier.is_draggable !== false}
+        >
+          {isEditing ? (
+            <div className="flex gap-1 items-center">
+              <Input
+                autoFocus
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleUpdateName()
+                  if (e.key === "Escape") setIsEditing(false)
+                }}
+                onClick={(e) => e.stopPropagation()}
+                disabled={isRenaming}
+                className="h-6 text-sm"
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={handleUpdateName}
+                disabled={isRenaming}
+              >
+                <Check className="h-3 w-3" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditName(tier.name)
+                }}
+                disabled={isRenaming}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
           ) : (
-            <div className="truncate text-sm">
-              {tier.name}
-              {hasChildren && <span className="text-xs text-muted-foreground ml-1">({tier.children?.length})</span>}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex-1 truncate">
+                <span className="font-medium">{tier.name}</span>
+                {tier.children && tier.children.length > 0 && (
+                  <span className="text-xs text-muted-foreground ml-1">({tier.children?.length || 0})</span>
+                )}
+              </div>
+
+              {!isEditing && user.is_admin && (
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                  {tier.children && tier.children.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setShowReorderMenu(!showReorderMenu)
+                      }}
+                      disabled={isLoading}
+                    >
+                      <ArrowUp className="h-3 w-3" />
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowCreate(!showCreate)
+                    }}
+                    disabled={isCreatingChild}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setIsEditing(true)
+                    }}
+                    disabled={isRenaming}
+                  >
+                    <Edit2 className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDuplicate()
+                    }}
+                    disabled={isDuplicating}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete()
+                    }}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reorder menu */}
+          {showReorderMenu && (
+            <div className="absolute right-0 top-full mt-1 bg-card border border-border rounded-lg shadow-lg p-2 z-10">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-start gap-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleMoveUp()
+                }}
+              >
+                <ArrowUp className="h-3 w-3" />
+                Move Up
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-start gap-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleMoveDown()
+                }}
+              >
+                <ArrowDown className="h-3 w-3" />
+                Move Down
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-start gap-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleIndent()
+                }}
+              >
+                <ArrowRight className="h-3 w-3" />
+                Indent
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="w-full justify-start gap-2 text-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleDedent()
+                }}
+              >
+                <ArrowLeft className="h-3 w-3" />
+                Dedent
+              </Button>
             </div>
           )}
         </div>
-
-        {/* Action buttons - unchanged from existing code */}
-        {user.is_admin && (
-          <div className="absolute right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none group-hover:pointer-events-auto rounded-md p-1 shadow-sm">
-            <Button
-              onClick={(e) => {
-                e.stopPropagation()
-                setIsEditing(true)
-              }}
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              style={{
-                color: isSelected ? "hsl(var(--primary-foreground))" : "currentColor",
-              }}
-              title="Edit tier name"
-              disabled={isLoading}
-            >
-              <Edit2 className="h-3 w-3" />
-            </Button>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowCreate(!showCreate)
-              }}
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              style={{
-                color: isSelected ? "hsl(var(--primary-foreground))" : "currentColor",
-              }}
-              title="Add child tier"
-              disabled={isLoading}
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            <Button
-              onClick={async (e) => {
-                e.stopPropagation()
-                await handleDuplicate()
-              }}
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              style={{
-                color: isSelected ? "hsl(var(--primary-foreground))" : "currentColor",
-              }}
-              title="Duplicate tier"
-              disabled={isLoading || isDuplicating}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3 w-3"
-              >
-                <rect x="3" y="3" width="8" height="8"></rect>
-                <path d="M13 3h8v8"></path>
-                <path d="M3 13v8h8"></path>
-                <rect x="13" y="13" width="8" height="8"></rect>
-              </svg>
-            </Button>
-            <Button
-              onClick={async (e) => {
-                e.stopPropagation()
-                handleDelete()
-              }}
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0 hover:text-destructive"
-              style={{
-                color: isSelected ? "hsl(var(--primary-foreground))" : "currentColor",
-              }}
-              title="Delete tier"
-              disabled={isLoading || isDeleting}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-            <Button
-              onClick={(e) => {
-                e.stopPropagation()
-                setShowReorderMenu(!showReorderMenu)
-              }}
-              size="sm"
-              variant="ghost"
-              className="h-6 w-6 p-0"
-              style={{
-                color: isSelected ? "hsl(var(--primary-foreground))" : "currentColor",
-              }}
-              title="Reorder tier"
-              disabled={isLoading}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="h-3 w-3"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </Button>
-          </div>
-        )}
       </div>
 
-      {isExpanded && hasChildren && (
-        <div>
-          {tier.children!.map((child) => (
-            <TierNode
-              key={child.id}
-              tier={child}
-              selectedTier={selectedTier}
-              onSelectTier={onSelectTier}
-              projectId={projectId}
-              onUpdate={onUpdate}
-              level={level + 1}
-              fields={fields}
-              user={user}
-              onDragStart={onDragStart}
-              draggedTier={draggedTier}
-              setDraggedTier={setDraggedTier}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-              dragOverTier={dragOverTier}
-              setDragOverTier={setDragOverTier}
-              dragDirection={dragDirection}
-              setDragDirection={setDragDirection}
-              handleDragEnd={handleDragEnd}
-              isExpanded={isExpanded}
-              onToggleExpanded={onToggleExpanded}
-            />
-          ))}
-        </div>
-      )}
-
+      {/* Create child form */}
       {showCreate && (
-        <div className="ml-8 mt-2 space-y-3 p-3 border border-border rounded-lg bg-card">
+        <div className="ml-6 space-y-2 mt-2 p-3 border border-border rounded-lg bg-card">
           <Input
             placeholder="Child tier name"
             value={newChildName}
             onChange={(e) => setNewChildName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleCreateChild()}
-            disabled={isLoading || isCreatingChild}
+            disabled={isCreatingChild}
           />
-          {user.is_admin && (
-            <>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={`allow-child-${tier.id}`}
-                  checked={allowChildCreation}
-                  onCheckedChange={(checked) => setAllowChildCreation(checked as boolean)}
-                  disabled={isLoading || isCreatingChild}
-                />
-                <label htmlFor={`allow-child-${tier.id}`} className="text-sm cursor-pointer">
-                  Allow creating children
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id={`allow-field-mgmt-${tier.id}`}
-                  checked={allowFieldManagement}
-                  onCheckedChange={(checked) => setAllowFieldManagement(checked as boolean)}
-                  disabled={isLoading || isCreatingChild}
-                />
-                <label htmlFor={`allow-field-mgmt-${tier.id}`} className="text-sm cursor-pointer">
-                  Allow users to add/remove fields
-                </label>
-              </div>
-            </>
-          )}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={`child-allow-${tier.id}`}
+              checked={allowChildCreation}
+              onCheckedChange={(checked) => setAllowChildCreation(checked as boolean)}
+              disabled={isCreatingChild}
+            />
+            <label htmlFor={`child-allow-${tier.id}`} className="text-xs cursor-pointer">
+              Allow child creation
+            </label>
+          </div>
           <div className="flex gap-2">
-            <Button onClick={handleCreateChild} size="sm" className="flex-1" disabled={isLoading || isCreatingChild}>
+            <Button onClick={handleCreateChild} size="sm" className="flex-1" disabled={isCreatingChild}>
               {isCreatingChild ? "Creating..." : "Create"}
             </Button>
             <Button
@@ -946,7 +948,7 @@ function TierNode({
               size="sm"
               variant="outline"
               className="flex-1"
-              disabled={isLoading || isCreatingChild}
+              disabled={isCreatingChild}
             >
               Cancel
             </Button>
@@ -954,60 +956,28 @@ function TierNode({
         </div>
       )}
 
-      {showReorderMenu && (
-        <div className="absolute left-full top-0 ml-2 bg-white border border-border rounded-md shadow-lg z-50 flex flex-col gap-1 p-1">
-          <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleMoveUp()
-            }}
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 hover:bg-accent"
-            title="Move up"
-            disabled={isLoading}
-          >
-            <ArrowUp className="h-3 w-3" />
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleMoveDown()
-            }}
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 hover:bg-accent"
-            title="Move down"
-            disabled={isLoading}
-          >
-            <ArrowDown className="h-3 w-3" />
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleIndent()
-            }}
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 hover:bg-accent"
-            title="Indent (move under previous)"
-            disabled={isLoading}
-          >
-            <ArrowRight className="h-3 w-3" />
-          </Button>
-          <Button
-            onClick={(e) => {
-              e.stopPropagation()
-              handleDedent()
-            }}
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 hover:bg-accent"
-            title="Dedent (move to parent level)"
-            disabled={isLoading}
-          >
-            <ArrowLeft className="h-3 w-3" />
-          </Button>
+      {/* Render children */}
+      {isExpanded && tier.children && tier.children.length > 0 && (
+        <div className="ml-3">
+          {tier.children?.map((child: Tier) => (
+            <TierNode
+              key={child.id}
+              tier={child}
+              level={level + 1}
+              selectedTierId={selectedTierId}
+              onSelectTier={onSelectTier}
+              onUpdate={onUpdate}
+              user={user}
+              projectId={projectId}
+              onToggleExpanded={onToggleExpanded}
+              expandedTiers={expandedTiers}
+              handleDragStart={handleDragStart}
+              handleDragOver={handleDragOver}
+              handleDrop={handleDrop}
+              handleDragEnd={handleDragEnd}
+              tiers={tiers} // Pass tiers to child TierNodes
+            />
+          ))}
         </div>
       )}
     </div>

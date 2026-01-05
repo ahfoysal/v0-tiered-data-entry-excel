@@ -5,11 +5,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, Lock, Mail } from "lucide-react"
+import { Loader2, Lock, Mail, Users } from "lucide-react"
 import { toast } from "sonner"
 
 export function LoginForm({ onLogin }: { onLogin: () => void }) {
+  const [loginType, setLoginType] = useState<"email" | "employee">("email")
   const [email, setEmail] = useState("admin@example.com")
+  const [employeeId, setEmployeeId] = useState("")
   const [password, setPassword] = useState("admin123")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -25,13 +27,19 @@ export function LoginForm({ onLogin }: { onLogin: () => void }) {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({
+          email: loginType === "email" ? email : undefined,
+          employeeId: loginType === "employee" ? employeeId : undefined,
+          password,
+          loginType,
+        }),
       })
 
       const data = await res.json()
 
       if (data.success) {
-        toast.success(`Welcome back! 👋 Logged in as ${email}`, {
+        const identifier = loginType === "email" ? email : employeeId
+        toast.success(`Welcome back! 👋`, {
           id: toastId,
         })
         setTimeout(() => onLogin(), 500)
@@ -71,6 +79,27 @@ export function LoginForm({ onLogin }: { onLogin: () => void }) {
         {/* Login Card */}
         <Card className="border border-border/50 shadow-xl backdrop-blur-sm bg-card/80">
           <CardContent className="pt-8 pb-8">
+            <div className="mb-6 flex gap-2">
+              <Button
+                type="button"
+                variant={loginType === "email" ? "default" : "outline"}
+                onClick={() => setLoginType("email")}
+                className="flex-1"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                Admin
+              </Button>
+              <Button
+                type="button"
+                variant={loginType === "employee" ? "default" : "outline"}
+                onClick={() => setLoginType("employee")}
+                className="flex-1"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Employee
+              </Button>
+            </div>
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {error && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive flex items-center gap-2">
@@ -79,35 +108,72 @@ export function LoginForm({ onLogin }: { onLogin: () => void }) {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-muted-foreground" />
-                  Email
-                </label>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@example.com"
-                  className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
-                  required
-                />
-              </div>
+              {loginType === "email" ? (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      Email
+                    </label>
+                    <Input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="admin@example.com"
+                      className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
+                      required
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-muted-foreground" />
-                  Password
-                </label>
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
-                  required
-                />
-              </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                      Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
+                      required
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Employee ID
+                    </label>
+                    <Input
+                      type="text"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      placeholder="e.g., EMP001"
+                      className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground flex items-center gap-2">
+                      <Lock className="w-4 h-4 text-muted-foreground" />
+                      Password
+                    </label>
+                    <Input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      className="bg-input/50 border-border/30 focus:border-primary/50 h-11"
+                      required
+                    />
+                    <p className="text-xs text-muted-foreground">Default: 123456</p>
+                  </div>
+                </>
+              )}
 
               <Button
                 type="submit"
@@ -125,7 +191,9 @@ export function LoginForm({ onLogin }: { onLogin: () => void }) {
               </Button>
 
               <p className="text-xs text-muted-foreground text-center pt-2">
-                Demo credentials: admin@example.com / admin123
+                {loginType === "email"
+                  ? "Demo: admin@example.com / admin123"
+                  : "Use your Employee ID with default password: 123456"}
               </p>
             </form>
           </CardContent>

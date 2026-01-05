@@ -1,15 +1,24 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { sql } from "@/lib/db"
-import { requireAuth, getCurrentUser } from "@/lib/auth"
+import { getCurrentUser } from "@/lib/auth"
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAuth()
-    const { id } = await params
+    const user = await getCurrentUser()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const resolvedParams = await params
+    const projectId = resolvedParams?.id
+
+    if (!projectId) {
+      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 })
+    }
 
     const tiers = await sql`
       SELECT * FROM tiers
-      WHERE project_id = ${id}
+      WHERE project_id = ${projectId}
       ORDER BY level, created_at
     `
 
@@ -36,9 +45,33 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getCurrentUser()
-    await requireAuth()
-    const { id } = await params
-    const { name, parent_id, allow_child_creation = true } = await request.json()
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const resolvedParams = await params
+    const projectId = resolvedParams?.id
+
+    if (!projectId || typeof projectId !== "string" || projectId.trim() === "") {
+      console.log("[v0] Invalid project_id:", projectId)
+      return NextResponse.json({ error: "Invalid project ID" }, { status: 400 })
+    }
+
+    const body = await request.json()
+    const { name, parent_id, allow_child_creation = true } = body
+
+    console.log("[v0] POST /api/projects/${projectId}/tiers - parent_id type:", typeof parent_id, "value:", parent_id)
+
+    if (parent_id !== undefined && parent_id !== null) {
+      if (typeof parent_id !== "string" || parent_id.trim() === "") {
+        console.log("[v0] Invalid parent_id format:", parent_id)
+        return NextResponse.json({ error: "Invalid parent_id format" }, { status: 400 })
+      }
+      if (parent_id === "undefined" || parent_id === "") {
+        console.log("[v0] parent_id is invalid string value:", parent_id)
+        return NextResponse.json({ error: "Invalid parent_id: cannot be undefined or empty" }, { status: 400 })
+      }
+    }
 
     if (parent_id && !user?.is_admin) {
       const parent = await sql`
@@ -49,11 +82,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
-    const level = parent_id ? (await sql`SELECT level FROM tiers WHERE id = ${parent_id}`)[0].level + 1 : 0
+    let level = 0
+    if (parent_id && typeof parent_id === "string" && parent_id.length > 0) {
+      console.log("[v0] Fetching parent tier with id:", parent_id)
+      const parentTier = await sql`SELECT level FROM tiers WHERE id = ${parent_id}`
+
+      if (!parentTier || parentTier.length === 0) {
+        console.log("[v0] Parent tier not found for id:", parent_id)
+        return NextResponse.json({ error: "Parent tier not found" }, { status: 404 })
+      }
+
+      level = parentTier[0].level + 1
+    }
+
+    console.log("[v0] Creating tier with - project_id:", projectId, "parent_id:", parent_id || null, "level:", level)
 
     const result = await sql`
       INSERT INTO tiers (project_id, parent_id, name, level, allow_child_creation)
-      VALUES (${id}, ${parent_id || null}, ${name}, ${level}, ${allow_child_creation})
+      VALUES (${projectId}, ${parent_id || null}, ${name}, ${level}, ${allow_child_creation})
       RETURNING *
     `
 

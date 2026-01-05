@@ -10,7 +10,7 @@ export async function getCurrentUser() {
   if (!userId) return null
 
   const users = await sql`
-    SELECT id, email, is_admin FROM users WHERE id = ${userId}
+    SELECT id, email, is_admin, user_role FROM users WHERE id = ${userId}
   `
   console.log("[v0] getCurrentUser - found users:", users)
 
@@ -40,7 +40,7 @@ export async function getUserFromRequest(request: NextRequest) {
   if (!userId) return null
 
   const users = await sql`
-    SELECT id, email, is_admin FROM users WHERE id = ${userId}
+    SELECT id, email, is_admin, user_role FROM users WHERE id = ${userId}
   `
   console.log("[v0] getUserFromRequest - found users:", users)
 

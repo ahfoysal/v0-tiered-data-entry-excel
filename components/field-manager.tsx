@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Download } from "lucide-react"
+import { Plus, Upload, X } from "lucide-react"
+import { toast } from "sonner"
 
 interface Field {
   id: string
@@ -57,6 +58,7 @@ export function FieldManager({
   const handleAddField = async () => {
     if (!newFieldName.trim()) return
 
+    const toastId = toast.loading("Creating new field...")
     setLoading(true)
     try {
       const res = await fetch(`/api/tiers/${tierId}/fields`, {
@@ -72,6 +74,9 @@ export function FieldManager({
 
       if (!res.ok) throw new Error("Failed to add field")
 
+      toast.dismiss(toastId)
+      toast.success(`Field "${newFieldName}" created successfully`)
+
       setNewFieldName("")
       setNewFieldOptions("")
       setNewFieldType("string")
@@ -79,13 +84,15 @@ export function FieldManager({
       onUpdate()
     } catch (error) {
       console.error("[v0] Error adding field:", error)
-      alert("Failed to add field")
+      toast.dismiss(toastId)
+      toast.error("Failed to add field")
     } finally {
       setLoading(false)
     }
   }
 
   const handleImportTemplate = async (templateId: string) => {
+    const loadingToastId = toast.loading("Importing template...")
     setLoading(true)
     try {
       const res = await fetch(`/api/tiers/${tierId}/import-template`, {
@@ -99,11 +106,14 @@ export function FieldManager({
         throw new Error(errorData.error || "Failed to import template")
       }
 
+      toast.dismiss(loadingToastId)
+      toast.success("Template imported successfully!")
       setShowTemplateImport(false)
       onUpdate()
     } catch (error) {
+      toast.dismiss(loadingToastId)
+      toast.error("Failed to import template: " + error)
       console.error("[v0] Error importing template:", error)
-      alert("Failed to import template: " + error)
     } finally {
       setLoading(false)
     }
@@ -135,36 +145,51 @@ export function FieldManager({
       <Card className="p-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex gap-2">
-            {/* Import template icon button */}
-            <div className="relative">
-              <Button
-                onClick={() => setShowTemplateImport(!showTemplateImport)}
-                variant="outline"
-                size="sm"
-                title="Import from template"
-                disabled={loading}
-              >
-                <Download className="h-4 w-4" />
-              </Button>
+            <Button
+              onClick={() => setShowTemplateImport(!showTemplateImport)}
+              variant="outline"
+              size="sm"
+              title="Import from template"
+              disabled={loading}
+              className="gap-1"
+            >
+              <Upload className="h-4 w-4" />
+              Import
+            </Button>
 
-              {showTemplateImport && templates.length > 0 && (
-                <div className="absolute top-full right-0 mt-2 w-48 p-3 bg-card border border-border rounded-lg shadow-lg z-10">
-                  <p className="text-xs font-medium mb-2">Select template:</p>
-                  <div className="space-y-1">
+            {/* Template import side drawer */}
+            {showTemplateImport && templates.length > 0 && (
+              <div className="fixed inset-0 z-40">
+                {/* Backdrop */}
+                <div className="absolute inset-0 bg-black/20" onClick={() => setShowTemplateImport(false)} />
+                {/* Side drawer */}
+                <div className="absolute right-0 top-0 bottom-0 w-80 bg-card border-l border-border shadow-xl z-50 flex flex-col">
+                  <div className="flex items-center justify-between p-4 border-b border-border">
+                    <h2 className="font-semibold">Select Template</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0"
+                      onClick={() => setShowTemplateImport(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2">
                     {templates.map((template) => (
                       <button
                         key={template.id}
                         onClick={() => handleImportTemplate(template.id)}
                         disabled={loading}
-                        className="w-full text-left text-sm px-2 py-1 rounded hover:bg-muted disabled:opacity-50"
+                        className="w-full text-left text-sm px-3 py-2 rounded hover:bg-muted disabled:opacity-50 transition-colors"
                       >
                         {template.name}
                       </button>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Add field button */}
             <Button
