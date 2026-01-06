@@ -13,11 +13,25 @@ interface User {
 export default function ProjectPage({
   params,
 }: {
-  params: { projectId: string }
+  params: Promise<{ projectId: string }>
 }) {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [projectId, setProjectId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const { projectId } = await params
+        setProjectId(projectId)
+      } catch (error) {
+        console.error("[v0] Failed to resolve params:", error)
+        router.push("/")
+      }
+    }
+    resolveParams()
+  }, [params, router])
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -50,7 +64,7 @@ export default function ProjectPage({
     })
   }
 
-  if (loading) {
+  if (loading || !projectId) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -67,5 +81,5 @@ export default function ProjectPage({
     return null
   }
 
-  return <HierarchyWorkspace projectId={params.projectId} user={user} onBack={handleBack} onLogout={handleLogout} />
+  return <HierarchyWorkspace projectId={projectId} user={user} onBack={handleBack} onLogout={handleLogout} />
 }

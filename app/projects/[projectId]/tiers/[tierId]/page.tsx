@@ -8,11 +8,27 @@ import type { User } from "@/types/user"
 export default function TierPage({
   params,
 }: {
-  params: { projectId: string; tierId: string }
+  params: Promise<{ projectId: string; tierId: string }>
 }) {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [projectId, setProjectId] = useState<string | null>(null)
+  const [tierId, setTierId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const resolveParams = async () => {
+      try {
+        const { projectId, tierId } = await params
+        setProjectId(projectId)
+        setTierId(tierId)
+      } catch (error) {
+        console.error("[v0] Failed to resolve params:", error)
+        router.push("/")
+      }
+    }
+    resolveParams()
+  }, [params, router])
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -32,7 +48,9 @@ export default function TierPage({
   }, [])
 
   const handleBack = () => {
-    router.push(`/projects/${params.projectId}`)
+    if (projectId) {
+      router.push(`/projects/${projectId}`)
+    }
   }
 
   const handleLogout = () => {
@@ -41,14 +59,14 @@ export default function TierPage({
     })
   }
 
-  if (loading) {
+  if (loading || !projectId || !tierId) {
     return <div className="flex items-center justify-center min-h-screen">Loading...</div>
   }
 
   return (
     <HierarchyWorkspace
-      projectId={params.projectId}
-      initialTierId={params.tierId}
+      projectId={projectId}
+      initialTierId={tierId}
       user={user as User}
       onBack={handleBack}
       onLogout={handleLogout}
